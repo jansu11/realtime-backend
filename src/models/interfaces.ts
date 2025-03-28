@@ -18,7 +18,6 @@ interface CloseData {
   quantity: number;
   purchase_price: number;
   sell_price: number;
-  entry_date: Date;
   exit_date: Date;
   pNl: number;
 }

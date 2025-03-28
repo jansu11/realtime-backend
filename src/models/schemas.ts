@@ -2,15 +2,15 @@ import mongoose,{Schema,Document} from 'mongoose';
 
 export interface ILivePosition extends Document {
   symbol: string;
-  avg_price: number,
-  total_quantity: number;
+  price: number,
+  quantity: number;
 }
 
 const LivePositionSchema = new Schema<ILivePosition>(
   {
     symbol : {type: String, required:true, unique: true},
-    avg_price: {type: Number, required: true},
-    total_quantity: {type: Number, required: true}
+    price: {type: Number, required: true},
+    quantity: {type: Number, required: true}
 
   }
 )
@@ -31,11 +31,9 @@ const sectorLeaderSchema = new mongoose.Schema({
 });
 
 const tradeHistory = new mongoose.Schema({
-  symbol : {type: String, required:true},
   purchase_price : {type: Number, required:true},
   sell_price : {type: Number, required:true},
   quantity : {type: Number, required:true},
-  entry_date : {type: String, required: true},
   exit_date : {type: String, required :true},
   pNl : {type: Number, required:true} 
 

@@ -18,8 +18,25 @@ const router = express_1.default.Router();
 // Add new stock position
 router.post('/position', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
+        const { symbol, quantity, price } = req.body;
         const position = new schemas_1.StockPosition(req.body);
         yield position.save();
+        const existingLivePosition = yield schemas_1.LivePosition.findOne({ symbol });
+        if (existingLivePosition) {
+            const newTotalQuantiy = existingLivePosition.quantity + quantity;
+            const newAvgPrice = (existingLivePosition.price * existingLivePosition.quantity + price * quantity) / newTotalQuantiy;
+            existingLivePosition.price = newAvgPrice;
+            existingLivePosition.quantity = newTotalQuantiy;
+            yield existingLivePosition.save();
+        }
+        else {
+            const newLivePosition = new schemas_1.LivePosition({
+                symbol,
+                price,
+                quantity,
+            });
+            yield newLivePosition.save();
+        }
         res.status(201).json(position);
     }
     catch (error) {
@@ -60,24 +77,7 @@ router.get('/positions', (req, res) => __awaiter(void 0, void 0, void 0, functio
 }));
 router.get('/agg-position', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const positions = yield schemas_1.StockPosition.aggregate([
-            {
-                $group: {
-                    _id: "$symbol", // Group by stock symbol
-                    totalQuantity: { $sum: "$quantity" }, // Sum quantity
-                    totalPrice: { $sum: { $multiply: ["$quantity", "$price"] } }, // Total price = price * quantity
-                    avgPrice: { $avg: "$price" }, // Optional: Average price per unit
-                },
-            },
-            {
-                $project: {
-                    _id: 0, // Exclude _id field
-                    symbol: "$_id",
-                    totalQuantity: 1,
-                    avgPrice: 1,
-                },
-            },
-        ]);
+        const positions = yield schemas_1.LivePosition.find();
         res.json(positions);
     }
     catch (error) {
@@ -107,16 +107,24 @@ router.get('/sector-leaders', (req, res) => __awaiter(void 0, void 0, void 0, fu
 router.post('/close-position', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     console.log(req.body);
     try {
-        const { purchase_price, sell_price, quantity, symbol, exit_date, entry_date } = req.body;
+        const { purchase_price, sell_price, quantity, symbol, exit_date, } = req.body;
         const pNl = (sell_price - purchase_price) * quantity;
-        const tradeHistory = new schemas_1.TradeHistory({ purchase_price, sell_price, quantity, symbol, entry_date, exit_date, pNl });
+        const tradeHistory = new schemas_1.TradeHistory({ purchase_price, sell_price, quantity, symbol, exit_date, pNl });
         console.log(tradeHistory);
         yield tradeHistory.save();
+        const livePosition = yield schemas_1.LivePosition.findOne({ symbol });
+        if (!livePosition) {
+            throw new Error("live position not found");
+        }
+        if (livePosition.quantity < quantity) {
+            throw new Error("not enough quantity to exit");
+        }
+        const updatedLiveQuantity = yield schemas_1.LivePosition.findOneAndUpdate({ symbol }, { $inc: { quantity: -quantity } }, { new: true });
+        console.log(updatedLiveQuantity);
         res.status(201).json({ message: 'Saved Trade History', tradeHistory });
     }
     catch (e) {
         res.status(400).json({ message: (e) });
     }
 }));
-router.post('/live-positions', (req) => __awaiter(void 0, void 0, void 0, function* () { return ; }));
 exports.default = router;

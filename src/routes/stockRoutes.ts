@@ -14,16 +14,16 @@ router.post('/position', async (req, res) => {
     const existingLivePosition = await LivePosition.findOne({symbol});
 
     if (existingLivePosition){
-      const newTotalQuantiy = existingLivePosition.total_quantity + quantity;
-      const newAvgPrice = (existingLivePosition.avg_price * existingLivePosition.total_quantity + price * quantity)/ newTotalQuantiy;
-      existingLivePosition.avg_price = newAvgPrice;
-      existingLivePosition.total_quantity = newTotalQuantiy;
+      const newTotalQuantiy = existingLivePosition.quantity + quantity;
+      const newAvgPrice = (existingLivePosition.price * existingLivePosition.quantity + price * quantity)/ newTotalQuantiy;
+      existingLivePosition.price = newAvgPrice;
+      existingLivePosition.quantity = newTotalQuantiy;
       await existingLivePosition.save();
     }else {
       const newLivePosition = new LivePosition({
         symbol,
-        avg_price : price,
-        total_quantity : quantity,
+         price ,
+        quantity,
 
       });
       await newLivePosition.save()
@@ -67,25 +67,7 @@ router.get('/positions', async (req, res) => { try {
 
 router.get('/agg-position', async (req, res) => {
   try {
-    const positions = await StockPosition.aggregate([
-      {
-        $group: {
-          _id: "$symbol", // Group by stock symbol
-          totalQuantity: { $sum: "$quantity" }, // Sum quantity
-          totalPrice: { $sum: { $multiply: ["$quantity", "$price"] } }, // Total price = price * quantity
-          avgPrice: { $avg: "$price" }, // Optional: Average price per unit
-        },
-      },
-      {
-        $project: {
-          _id: 0, // Exclude _id field
-          symbol: "$_id",
-          totalQuantity: 1,
-          avgPrice: 1,
-        },
-      },
-    ]);
-
+    const positions = await LivePosition.find();
     res.json(positions);
   } catch (error) {
     res.status(400).json({ message: (error as Error).message });
@@ -119,12 +101,11 @@ router.post('/close-position',async(req:Request,res:Response) => {
       quantity,
       symbol, 
       exit_date,
-      entry_date
       
     } = req.body;
     const pNl = (sell_price - purchase_price) * quantity;
 
-    const tradeHistory = new TradeHistory({purchase_price,sell_price,quantity,symbol,entry_date,exit_date,pNl})
+    const tradeHistory = new TradeHistory({purchase_price,sell_price,quantity,symbol,exit_date,pNl})
     console.log(tradeHistory)
 
     await tradeHistory.save()
@@ -134,14 +115,14 @@ router.post('/close-position',async(req:Request,res:Response) => {
       throw new Error("live position not found")
 
     }
-    if(livePosition.total_quantity < quantity) {
+    if(livePosition.quantity < quantity) {
       throw new Error ("not enough quantity to exit")
     }
 
 
     const updatedLiveQuantity = await LivePosition.findOneAndUpdate(
       {symbol},
-      {$inc: {total_quantity: - quantity}},
+      {$inc: {quantity: - quantity}},
       {new: true}
     ) 
 
